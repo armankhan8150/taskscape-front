@@ -15,7 +15,12 @@ interface NavbarProps {
   onQuickAdd: () => void;
 }
 
+import { useAuth } from "@/providers/AuthProvider";
+import { useNavigate } from "react-router-dom";
+
 export function Navbar({ onQuickAdd }: NavbarProps) {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex h-16 items-center gap-4 px-6">
@@ -56,17 +61,15 @@ export function Navbar({ onQuickAdd }: NavbarProps) {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-popover" align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Log out</DropdownMenuItem>
-            </DropdownMenuContent>
+              <DropdownMenuContent className="w-56 bg-popover" align="end">
+                <DropdownMenuLabel>{user?.email ?? "My Account"}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/") }>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => { await signOut(); navigate("/auth", { replace: true }); }}>Log out</DropdownMenuItem>
+              </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
