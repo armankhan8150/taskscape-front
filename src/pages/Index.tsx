@@ -5,9 +5,10 @@ import { Dashboard } from "@/components/Dashboard";
 import { TaskBoard } from "@/components/TaskBoard";
 import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
 import { QuickAddTask } from "@/components/QuickAddTask";
-import { tasks as initialTasks, projects, teamMembers } from "@/data/mockData";
+import { tasks as initialTasks, projects, teamMembers as mockTeamMembers } from "@/data/mockData";
 import { Task, TaskStatus } from "@/types/task";
 import { toast } from "sonner";
+import { useTeamMembers } from "@/hooks/useTeamMembers";
 
 type View = "dashboard" | "board";
 
@@ -20,6 +21,8 @@ const Index = () => {
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddStatus, setQuickAddStatus] = useState<TaskStatus>("todo");
+  
+  const { data: teamMembers = [], isLoading } = useTeamMembers();
 
   const handleProjectClick = (projectId: string) => {
     setSelectedProject(projectId);
@@ -50,7 +53,7 @@ const Index = () => {
     projectId: string;
     assigneeId: string;
   }) => {
-    const assignee = teamMembers.find((m) => m.id === taskData.assigneeId) || null;
+    const assignee = (teamMembers.length > 0 ? teamMembers : mockTeamMembers).find((m) => m.id === taskData.assigneeId) || null;
     const newTask: Task = {
       id: Date.now().toString(),
       title: taskData.title,
