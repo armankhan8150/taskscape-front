@@ -1,4 +1,11 @@
-import { Task, TaskStatus, TaskPriority } from "@/types/task";
+import {
+  Task,
+  TaskStatus,
+  TaskPriority,
+  TeamMember,
+  Comment,
+  Profile,
+} from "@/types/task";
 import {
   Sheet,
   SheetContent,
@@ -27,60 +34,84 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TeamMember } from "@/types/task";
-import { useTaskComments } from "@/hooks/useTaskComments";
-import { useCommentMutations } from "@/hooks/useCommentMutations";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
 
 interface TaskDetailDrawerProps {
   task: Task | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdateTask: (task: Task) => void;
-  teamMembers: TeamMember[];
+  onUpdateTask: (
+    task: Database["public"]["Tables"]["tasks"]["Update"] & { id: string },
+  ) => void;
+  teamMembers: TeamMember[]; // Receive team members as a prop
 }
+
+// Hook to fetch comments for a specific task
+const useTaskComments = (taskId: string | null) => {
+  return useQuery({
+    queryKey: ["comments", taskId],
+    queryFn: async (): Promise<Comment[]> => {
+      if (!taskId) return [];
+      
+      const { data, error } = await supabase
+        .from("task_comments")
+        .select("*, author:profiles(*)")
+        .eq("task_id", taskId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      // Transform data to match our frontend Comment type
+      return data.map((c) => ({
+        id: c.id,
+        content: c.content,
+        created_at: c.created_at,
+        task_id: c.task_id,
+        user_id: c.user_id,
+        author: c.author
+          ? {
+              id: c.author.id,
+              full_name: c.author.full_name,
+              avatar_url: c.author.avatar_url,
+            }
+          : null,
+      }));
+    },
+    enabled: !!taskId, // Only run query if taskId is available
+  });
+};
 
 export function TaskDetailDrawer({
   task,
   open,
   onOpenChange,
   onUpdateTask,
-  teamMembers,
+  teamMembers, // Use prop
 }: TaskDetailDrawerProps) {
-  const [newComment, setNewComment] = useState("");
-  const { data: comments = [] } = useTaskComments(task?.id);
-  const { createComment } = useCommentMutations();
+  const {
+    data: comments = [],
+    isLoading: isLoadingComments,
+  } = useTaskComments(task?.id || null);
 
   if (!task) return null;
 
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
-
-  const handleAddComment = () => {
-    if (!newComment.trim() || !task) return;
-    
-    createComment.mutate(
-      { taskId: task.id, content: newComment },
-      {
-        onSuccess: () => {
-          setNewComment("");
-        },
-      }
-    );
-  };
+  const isOverdue =
+    task.due_date &&
+    new Date(task.due_date) < new Date() &&
+    task.status !== "done";
 
   const handleStatusChange = (status: TaskStatus) => {
-    onUpdateTask({ ...task, status });
+    onUpdateTask({ id: task.id, status });
   };
 
   const handlePriorityChange = (priority: TaskPriority) => {
-    onUpdateTask({ ...task, priority });
+    onUpdateTask({ id: task.id, priority });
   };
 
   const handleAssigneeChange = (assigneeId: string) => {
-    const assignee = teamMembers.find((m) => m.id === assigneeId);
-    if (assignee) {
-      onUpdateTask({ ...task, assignee });
-    }
+    onUpdateTask({ id: task.id, assigned_to: assigneeId || null });
   };
 
   return (
@@ -94,11 +125,16 @@ export function TaskDetailDrawer({
           <div className="space-y-6">
             {/* Description */}
             <div>
-              <label className="text-sm font-medium mb-2 block">Description</label>
+              <label className="text-sm font-medium mb-2 block">
+                Description
+              </label>
               <Textarea
-                value={task.description}
+                defaultValue={task.description || ""}
                 className="min-h-[100px] resize-none"
                 placeholder="Add a description..."
+                onBlur={(e) =>
+                  onUpdateTask({ id: task.id, description: e.target.value })
+                }
               />
             </div>
 
@@ -129,7 +165,10 @@ export function TaskDetailDrawer({
                   <AlertCircle className="h-4 w-4 text-muted-foreground" />
                   Priority
                 </label>
-                <Select value={task.priority} onValueChange={handlePriorityChange}>
+                <Select
+                  value={task.priority}
+                  onValueChange={handlePriorityChange}
+                >
                   <SelectTrigger className="bg-muted/50">
                     <SelectValue />
                   </SelectTrigger>
@@ -159,7 +198,10 @@ export function TaskDetailDrawer({
                       <SelectItem key={member.id} value={member.id}>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-5 w-5">
-                            <AvatarImage src={member.avatar} alt={member.name} />
+                            <AvatarImage
+                              src={member.avatar}
+                              alt={member.name}
+                            />
                             <AvatarFallback>{member.name[0]}</AvatarFallback>
                           </Avatar>
                           {member.name}
@@ -180,11 +222,11 @@ export function TaskDetailDrawer({
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal bg-muted/50",
-                    isOverdue && "text-destructive border-destructive"
+                    isOverdue && "text-destructive border-destructive",
                   )}
                 >
-                  {task.dueDate
-                    ? new Date(task.dueDate).toLocaleDateString("en-US", {
+                  {task.due_date
+                    ? new Date(task.due_date).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
@@ -201,7 +243,7 @@ export function TaskDetailDrawer({
                 Tags
               </label>
               <div className="flex flex-wrap gap-2">
-                {task.tags.map((tag) => (
+                {task.tags?.map((tag) => (
                   <Badge key={tag} variant="secondary">
                     {tag}
                   </Badge>
@@ -222,22 +264,33 @@ export function TaskDetailDrawer({
               </label>
 
               <div className="space-y-4">
+                {isLoadingComments && <p>Loading comments...</p>}
                 {comments.map((comment) => (
                   <div key={comment.id} className="flex gap-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback>{comment.author[0]}</AvatarFallback>
+                      <AvatarImage src={comment.author?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author?.id}`} />
+                      <AvatarFallback>
+                        {comment.author?.full_name?.[0] || "U"}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">{comment.author}</span>
+                        <span className="text-sm font-medium">
+                          {comment.author?.full_name || "User"}
+                        </span>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(comment.createdAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {new Date(comment.created_at).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                            },
+                          )}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{comment.content}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {comment.content}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -250,17 +303,10 @@ export function TaskDetailDrawer({
                   <div className="flex-1">
                     <Textarea
                       placeholder="Add a comment..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
                       className="min-h-[80px] resize-none bg-muted/50"
                     />
-                    <Button 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={handleAddComment}
-                      disabled={!newComment.trim() || createComment.isPending}
-                    >
-                      {createComment.isPending ? "Adding..." : "Add Comment"}
+                    <Button size="sm" className="mt-2">
+                      Add Comment
                     </Button>
                   </div>
                 </div>

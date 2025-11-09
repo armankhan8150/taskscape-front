@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,32 +15,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TaskStatus, TaskPriority, Project, TeamMember } from "@/types/task";
+import { TaskStatus, TaskPriority, TeamMember, Project } from "@/types/task";
+import { useAuth } from "@/providers/AuthProvider";
 
 interface QuickAddTaskProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultStatus?: TaskStatus;
+  projects: Omit<Project, "taskCounts">[]; // Use live data
+  teamMembers: TeamMember[]; // Use live data
   onAddTask: (task: {
     title: string;
     description: string;
     status: TaskStatus;
     priority: TaskPriority;
-    projectId: string;
-    assigneeId: string;
+    project_id: string;
+    assigned_to: string | null;
+    created_by: string;
   }) => void;
-  projects: Project[];
-  teamMembers: TeamMember[];
 }
 
 export function QuickAddTask({
   open,
   onOpenChange,
   defaultStatus = "todo",
-  onAddTask,
   projects,
   teamMembers,
+  onAddTask,
 }: QuickAddTaskProps) {
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>(defaultStatus);
@@ -48,17 +51,29 @@ export function QuickAddTask({
   const [projectId, setProjectId] = useState(projects[0]?.id || "");
   const [assigneeId, setAssigneeId] = useState("");
 
+  // Effect to update status and project ID when props change
+  useEffect(() => {
+    setStatus(defaultStatus);
+  }, [defaultStatus, open]);
+
+  useEffect(() => {
+    if (projects.length > 0 && !projectId) {
+      setProjectId(projects[0].id);
+    }
+  }, [projects, projectId]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !user) return;
 
     onAddTask({
       title,
       description,
       status,
       priority,
-      projectId,
-      assigneeId,
+      project_id: projectId,
+      assigned_to: assigneeId || null,
+      created_by: user.id,
     });
 
     // Reset form
@@ -100,7 +115,10 @@ export function QuickAddTask({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Status</label>
-              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
+              <Select
+                value={status}
+                onValueChange={(v) => setStatus(v as TaskStatus)}
+              >
                 <SelectTrigger className="bg-muted/50">
                   <SelectValue />
                 </SelectTrigger>
@@ -115,7 +133,10 @@ export function QuickAddTask({
 
             <div>
               <label className="text-sm font-medium mb-2 block">Priority</label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+              <Select
+                value={priority}
+                onValueChange={(v) => setPriority(v as TaskPriority)}
+              >
                 <SelectTrigger className="bg-muted/50">
                   <SelectValue />
                 </SelectTrigger>
@@ -161,7 +182,11 @@ export function QuickAddTask({
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={!title.trim()}>

@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Navbar } from "@/components/Navbar";
 import { TeamSidebar } from "@/components/TeamSidebar";
 import { Dashboard } from "@/components/Dashboard";
 import { TaskBoard } from "@/components/TaskBoard";
 import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
 import { QuickAddTask } from "@/components/QuickAddTask";
-import { Task, TaskStatus } from "@/types/task";
+import { Task, TaskStatus, Project } from "@/types/task";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useProjects } from "@/hooks/useProjects";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
+import { Database } from "@/integrations/supabase/types";
 
 type View = "dashboard" | "board";
 
@@ -21,10 +22,13 @@ const Index = () => {
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddStatus, setQuickAddStatus] = useState<TaskStatus>("todo");
-  
-  const { data: teamMembers = [] } = useTeamMembers();
-  const { data: projects = [] } = useProjects();
-  const { data: tasks = [] } = useTasks();
+
+  // Fetch all live data from Supabase
+  const { data: teamMembers = [], isLoading: isLoadingMembers } = useTeamMembers();
+  const { data: projects = [], isLoading: isLoadingProjects } = useProjects();
+  const { data: tasks = [], isLoading: isLoadingTasks } = useTasks();
+
+  // Get mutation functions
   const { createTask, updateTask } = useTaskMutations();
 
   const handleProjectClick = (projectId: string) => {
@@ -42,20 +46,27 @@ const Index = () => {
     setShowTaskDetail(true);
   };
 
-  const handleUpdateTask = (updatedTask: Task) => {
-    updateTask.mutate(updatedTask);
-    setSelectedTask(updatedTask);
+  // Connect task updates to the database
+  const handleUpdateTask = (
+    taskData: Database["public"]["Tables"]["tasks"]["Update"] & { id: string },
+  ) => {
+    updateTask(taskData);
+    if (selectedTask && taskData.status) {
+      setSelectedTask({ ...selectedTask, ...taskData });
+    }
   };
 
+  // Connect adding tasks to the database
   const handleAddTask = (taskData: {
     title: string;
     description: string;
     status: TaskStatus;
     priority: any;
-    projectId: string;
-    assigneeId: string;
+    project_id: string;
+    assigned_to: string | null;
+    created_by: string;
   }) => {
-    createTask.mutate(taskData);
+    createTask(taskData);
   };
 
   const handleQuickAdd = (status?: TaskStatus) => {
@@ -65,17 +76,50 @@ const Index = () => {
     setShowQuickAdd(true);
   };
 
-  const filteredTasks = tasks.filter((task) => {
-    if (view === "board" && selectedProject) {
-      if (task.projectId !== selectedProject) return false;
-    }
-    if (selectedMember) {
-      if (task.assignee?.id !== selectedMember) return false;
-    }
-    return true;
-  });
+  // Calculate project task counts from the live tasks
+  const projectsWithCounts: Project[] = useMemo(() => {
+    return projects.map((project) => {
+      const projectTasks = tasks.filter((t) => t.project_id === project.id);
+      return {
+        ...project,
+        taskCounts: {
+          todo: projectTasks.filter((t) => t.status === "todo").length,
+          "in-progress": projectTasks.filter(
+            (t) => t.status === "in-progress",
+          ).length,
+          review: projectTasks.filter((t) => t.status === "review").length,
+          done: projectTasks.filter((t) => t.status === "done").length,
+        },
+      };
+    });
+  }, [projects, tasks]);
 
-  const currentProject = projects.find((p) => p.id === selectedProject);
+  // Filter tasks based on selected project and member
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (view === "board" && selectedProject) {
+        if (task.project_id !== selectedProject) return false;
+      }
+      if (selectedMember) {
+        if (task.assignee?.id !== selectedMember) return false;
+      }
+      return true;
+    });
+  }, [tasks, view, selectedProject, selectedMember]);
+
+  const currentProject = projectsWithCounts.find(
+    (p) => p.id === selectedProject,
+  );
+
+  const isLoading = isLoadingMembers || isLoadingProjects || isLoadingTasks;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <div className="text-muted-foreground">Loading TeamTasks...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col">
@@ -90,7 +134,10 @@ const Index = () => {
 
         <main className="flex-1 overflow-auto p-6">
           {view === "dashboard" ? (
-            <Dashboard projects={projects} onProjectClick={handleProjectClick} />
+            <Dashboard
+              projects={projectsWithCounts}
+              onProjectClick={handleProjectClick}
+            />
           ) : (
             currentProject && (
               <TaskBoard
@@ -110,7 +157,7 @@ const Index = () => {
         open={showTaskDetail}
         onOpenChange={setShowTaskDetail}
         onUpdateTask={handleUpdateTask}
-        teamMembers={teamMembers}
+        teamMembers={teamMembers} 
       />
 
       <QuickAddTask
@@ -118,8 +165,8 @@ const Index = () => {
         onOpenChange={setShowQuickAdd}
         defaultStatus={quickAddStatus}
         onAddTask={handleAddTask}
-        projects={projects}
-        teamMembers={teamMembers}
+        projects={projects} 
+        teamMembers={teamMembers} 
       />
     </div>
   );
