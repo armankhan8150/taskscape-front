@@ -12,7 +12,7 @@ export const useTaskComments = (taskId: string | undefined) => {
         .from("task_comments")
         .select(`
           *,
-          author:profiles!task_comments_user_id_fkey(full_name, email, avatar_url)
+          author:profiles(id, full_name, avatar_url)
         `)
         .eq("task_id", taskId)
         .order("created_at", { ascending: true });
@@ -22,9 +22,15 @@ export const useTaskComments = (taskId: string | undefined) => {
       // Transform to match Comment interface
       const comments: Comment[] = (data || []).map((comment: any) => ({
         id: comment.id,
-        author: comment.author?.full_name || comment.author?.email || "Unknown",
+        author: comment.author ? {
+          id: comment.author.id,
+          full_name: comment.author.full_name,
+          avatar_url: comment.author.avatar_url,
+        } : null,
         content: comment.content,
-        createdAt: comment.created_at,
+        created_at: comment.created_at,
+        task_id: comment.task_id,
+        user_id: comment.user_id,
       }));
 
       return comments;

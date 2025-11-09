@@ -34,9 +34,10 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
+import { useTaskComments } from "@/hooks/useTaskComments";
+import { useCommentMutations } from "@/hooks/useCommentMutations";
+import { useState } from "react";
 
 interface TaskDetailDrawerProps {
   task: Task | null;
@@ -48,41 +49,6 @@ interface TaskDetailDrawerProps {
   teamMembers: TeamMember[]; // Receive team members as a prop
 }
 
-// Hook to fetch comments for a specific task
-const useTaskComments = (taskId: string | null) => {
-  return useQuery({
-    queryKey: ["comments", taskId],
-    queryFn: async (): Promise<Comment[]> => {
-      if (!taskId) return [];
-      
-      const { data, error } = await supabase
-        .from("task_comments")
-        .select("*, author:profiles(*)")
-        .eq("task_id", taskId)
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
-
-      // Transform data to match our frontend Comment type
-      return data.map((c) => ({
-        id: c.id,
-        content: c.content,
-        created_at: c.created_at,
-        task_id: c.task_id,
-        user_id: c.user_id,
-        author: c.author
-          ? {
-              id: c.author.id,
-              full_name: c.author.full_name,
-              avatar_url: c.author.avatar_url,
-            }
-          : null,
-      }));
-    },
-    enabled: !!taskId, // Only run query if taskId is available
-  });
-};
-
 export function TaskDetailDrawer({
   task,
   open,
@@ -90,10 +56,12 @@ export function TaskDetailDrawer({
   onUpdateTask,
   teamMembers, // Use prop
 }: TaskDetailDrawerProps) {
+  const [newComment, setNewComment] = useState("");
   const {
     data: comments = [],
     isLoading: isLoadingComments,
-  } = useTaskComments(task?.id || null);
+  } = useTaskComments(task?.id);
+  const { createComment } = useCommentMutations();
 
   if (!task) return null;
 
@@ -112,6 +80,18 @@ export function TaskDetailDrawer({
 
   const handleAssigneeChange = (assigneeId: string) => {
     onUpdateTask({ id: task.id, assigned_to: assigneeId || null });
+  };
+
+  const handleAddComment = () => {
+    if (!newComment.trim() || !task.id) return;
+    createComment.mutate(
+      { taskId: task.id, content: newComment },
+      {
+        onSuccess: () => {
+          setNewComment("");
+        },
+      }
+    );
   };
 
   return (
@@ -304,9 +284,16 @@ export function TaskDetailDrawer({
                     <Textarea
                       placeholder="Add a comment..."
                       className="min-h-[80px] resize-none bg-muted/50"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
                     />
-                    <Button size="sm" className="mt-2">
-                      Add Comment
+                    <Button 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={handleAddComment}
+                      disabled={!newComment.trim() || createComment.isPending}
+                    >
+                      {createComment.isPending ? "Adding..." : "Add Comment"}
                     </Button>
                   </div>
                 </div>
