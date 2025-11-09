@@ -15,8 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TaskStatus, TaskPriority } from "@/types/task";
-import { projects, teamMembers } from "@/data/mockData";
+import { TaskStatus, TaskPriority, Project, TeamMember } from "@/types/task";
 
 interface QuickAddTaskProps {
   open: boolean;
@@ -30,6 +29,8 @@ interface QuickAddTaskProps {
     projectId: string;
     assigneeId: string;
   }) => void;
+  projects: Project[];
+  teamMembers: TeamMember[];
 }
 
 export function QuickAddTask({
@@ -37,12 +38,14 @@ export function QuickAddTask({
   onOpenChange,
   defaultStatus = "todo",
   onAddTask,
+  projects,
+  teamMembers,
 }: QuickAddTaskProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>(defaultStatus);
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [projectId, setProjectId] = useState(projects[0].id);
+  const [projectId, setProjectId] = useState(projects[0]?.id || "");
   const [assigneeId, setAssigneeId] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {

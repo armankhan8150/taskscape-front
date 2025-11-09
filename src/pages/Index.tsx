@@ -5,10 +5,11 @@ import { Dashboard } from "@/components/Dashboard";
 import { TaskBoard } from "@/components/TaskBoard";
 import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
 import { QuickAddTask } from "@/components/QuickAddTask";
-import { tasks as initialTasks, projects, teamMembers as mockTeamMembers } from "@/data/mockData";
 import { Task, TaskStatus } from "@/types/task";
-import { toast } from "sonner";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
+import { useProjects } from "@/hooks/useProjects";
+import { useTasks } from "@/hooks/useTasks";
+import { useTaskMutations } from "@/hooks/useTaskMutations";
 
 type View = "dashboard" | "board";
 
@@ -16,13 +17,15 @@ const Index = () => {
   const [view, setView] = useState<View>("dashboard");
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddStatus, setQuickAddStatus] = useState<TaskStatus>("todo");
   
-  const { data: teamMembers = [], isLoading } = useTeamMembers();
+  const { data: teamMembers = [] } = useTeamMembers();
+  const { data: projects = [] } = useProjects();
+  const { data: tasks = [] } = useTasks();
+  const { createTask, updateTask } = useTaskMutations();
 
   const handleProjectClick = (projectId: string) => {
     setSelectedProject(projectId);
@@ -40,9 +43,8 @@ const Index = () => {
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
-    setTasks(tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+    updateTask.mutate(updatedTask);
     setSelectedTask(updatedTask);
-    toast.success("Task updated successfully");
   };
 
   const handleAddTask = (taskData: {
@@ -53,22 +55,7 @@ const Index = () => {
     projectId: string;
     assigneeId: string;
   }) => {
-    const assignee = (teamMembers.length > 0 ? teamMembers : mockTeamMembers).find((m) => m.id === taskData.assigneeId) || null;
-    const newTask: Task = {
-      id: Date.now().toString(),
-      title: taskData.title,
-      description: taskData.description,
-      status: taskData.status,
-      priority: taskData.priority,
-      assignee,
-      dueDate: null,
-      tags: [],
-      comments: [],
-      projectId: taskData.projectId,
-      createdAt: new Date().toISOString(),
-    };
-    setTasks([...tasks, newTask]);
-    toast.success("Task created successfully");
+    createTask.mutate(taskData);
   };
 
   const handleQuickAdd = (status?: TaskStatus) => {
@@ -123,6 +110,7 @@ const Index = () => {
         open={showTaskDetail}
         onOpenChange={setShowTaskDetail}
         onUpdateTask={handleUpdateTask}
+        teamMembers={teamMembers}
       />
 
       <QuickAddTask
@@ -130,6 +118,8 @@ const Index = () => {
         onOpenChange={setShowQuickAdd}
         defaultStatus={quickAddStatus}
         onAddTask={handleAddTask}
+        projects={projects}
+        teamMembers={teamMembers}
       />
     </div>
   );

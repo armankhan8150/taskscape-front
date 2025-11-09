@@ -27,13 +27,17 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { teamMembers } from "@/data/mockData";
+import { TeamMember } from "@/types/task";
+import { useTaskComments } from "@/hooks/useTaskComments";
+import { useCommentMutations } from "@/hooks/useCommentMutations";
+import { useState } from "react";
 
 interface TaskDetailDrawerProps {
   task: Task | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateTask: (task: Task) => void;
+  teamMembers: TeamMember[];
 }
 
 export function TaskDetailDrawer({
@@ -41,10 +45,28 @@ export function TaskDetailDrawer({
   open,
   onOpenChange,
   onUpdateTask,
+  teamMembers,
 }: TaskDetailDrawerProps) {
+  const [newComment, setNewComment] = useState("");
+  const { data: comments = [] } = useTaskComments(task?.id);
+  const { createComment } = useCommentMutations();
+
   if (!task) return null;
 
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+
+  const handleAddComment = () => {
+    if (!newComment.trim() || !task) return;
+    
+    createComment.mutate(
+      { taskId: task.id, content: newComment },
+      {
+        onSuccess: () => {
+          setNewComment("");
+        },
+      }
+    );
+  };
 
   const handleStatusChange = (status: TaskStatus) => {
     onUpdateTask({ ...task, status });
@@ -196,11 +218,11 @@ export function TaskDetailDrawer({
             <div>
               <label className="text-sm font-medium mb-4 flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                Comments ({task.comments.length})
+                Comments ({comments.length})
               </label>
 
               <div className="space-y-4">
-                {task.comments.map((comment) => (
+                {comments.map((comment) => (
                   <div key={comment.id} className="flex gap-3">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback>{comment.author[0]}</AvatarFallback>
@@ -228,10 +250,17 @@ export function TaskDetailDrawer({
                   <div className="flex-1">
                     <Textarea
                       placeholder="Add a comment..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
                       className="min-h-[80px] resize-none bg-muted/50"
                     />
-                    <Button size="sm" className="mt-2">
-                      Add Comment
+                    <Button 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={handleAddComment}
+                      disabled={!newComment.trim() || createComment.isPending}
+                    >
+                      {createComment.isPending ? "Adding..." : "Add Comment"}
                     </Button>
                   </div>
                 </div>
