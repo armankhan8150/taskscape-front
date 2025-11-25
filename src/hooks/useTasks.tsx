@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Task, Profile } from "@/types/task";
 import { Database } from "@/integrations/supabase/types";
@@ -35,10 +36,28 @@ const transformTask = (row: TaskRow): Task => {
 };
 
 export const useTasks = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("tasks-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ["tasks"],
     queryFn: async () => {
-      // Query tasks, join profiles (as assignee), and get comment count
       const { data, error } = await supabase
         .from("tasks")
         .select(
@@ -47,7 +66,6 @@ export const useTasks = () => {
 
       if (error) throw error;
 
-      // Transform each row to match our frontend Task type
       const tasks: Task[] = data.map(transformTask as any);
       return tasks;
     },
