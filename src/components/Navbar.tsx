@@ -1,4 +1,4 @@
-import { Search, Plus, Bell, Settings } from "lucide-react";
+import { Search, Plus, Bell, Settings, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,12 +13,13 @@ import {
 
 interface NavbarProps {
   onQuickAdd: () => void;
+  onCreateProject: () => void;
 }
 
 import { useAuth } from "@/providers/AuthProvider";
 import { useNavigate } from "react-router-dom";
 
-export function Navbar({ onQuickAdd }: NavbarProps) {
+export function Navbar({ onQuickAdd, onCreateProject }: NavbarProps) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   return (
@@ -42,6 +43,11 @@ export function Navbar({ onQuickAdd }: NavbarProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button onClick={onCreateProject} variant="outline" size="sm" className="gap-2 hidden md:flex">
+            <FolderPlus className="h-4 w-4" />
+            <span>New Project</span>
+          </Button>
+
           <Button onClick={onQuickAdd} size="sm" className="gap-2">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">New Task</span>
