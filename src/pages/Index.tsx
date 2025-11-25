@@ -5,6 +5,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { TaskBoard } from "@/components/TaskBoard";
 import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
 import { QuickAddTask } from "@/components/QuickAddTask";
+import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 import { Task, TaskStatus, Project } from "@/types/task";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useProjects } from "@/hooks/useProjects";
@@ -21,6 +22,7 @@ const Index = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showCreateProject, setShowCreateProject] = useState(false);
   const [quickAddStatus, setQuickAddStatus] = useState<TaskStatus>("todo");
 
   // Fetch all live data from Supabase
@@ -123,7 +125,10 @@ const Index = () => {
 
   return (
     <div className="h-screen flex flex-col">
-      <Navbar onQuickAdd={() => handleQuickAdd()} />
+      <Navbar 
+        onQuickAdd={() => handleQuickAdd()} 
+        onCreateProject={() => setShowCreateProject(true)}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         <TeamSidebar
@@ -167,6 +172,11 @@ const Index = () => {
         onAddTask={handleAddTask}
         projects={projects} 
         teamMembers={teamMembers} 
+      />
+
+      <CreateProjectDialog
+        open={showCreateProject}
+        onOpenChange={setShowCreateProject}
       />
     </div>
   );
