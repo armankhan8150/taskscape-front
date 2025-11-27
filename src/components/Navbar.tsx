@@ -20,8 +20,9 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useNavigate } from "react-router-dom";
 
 export function Navbar({ onQuickAdd, onCreateProject }: NavbarProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, roles } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = roles.includes("admin");
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex h-16 items-center gap-4 px-6">
@@ -53,29 +54,45 @@ export function Navbar({ onQuickAdd, onCreateProject }: NavbarProps) {
             <span className="hidden sm:inline">New Task</span>
           </Button>
 
-          <Button variant="ghost" size="icon" className="relative">
+          <Button variant="ghost" size="icon">
             <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive"></span>
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=User" alt="User" />
-                  <AvatarFallback>U</AvatarFallback>
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Avatar>
+                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`} />
+                  <AvatarFallback>
+                    {user?.email?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 bg-popover" align="end">
-                <DropdownMenuLabel>{user?.email ?? "My Account"}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/") }>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{user?.email}</p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {roles.includes("admin") ? "Admin" : roles.includes("manager") ? "Manager" : "Employee"}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/")}>
+                Dashboard
+              </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem onClick={() => navigate("/admin")}>
                   <Settings className="mr-2 h-4 w-4" />
-                  Dashboard
+                  Admin Panel
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={async () => { await signOut(); navigate("/auth", { replace: true }); }}>Log out</DropdownMenuItem>
-              </DropdownMenuContent>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={async () => { await signOut(); navigate("/auth", { replace: true }); }}>
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>

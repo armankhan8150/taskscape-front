@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/Auth";
+import AdminPage from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./providers/AuthProvider";
 
@@ -17,21 +18,29 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<AuthPage />} />
-          <Route
-            path="/"
-            element={
-              <AuthProvider>
+        <AuthProvider>
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route
+              path="/"
+              element={
                 <ProtectedRoute>
                   <Index />
                 </ProtectedRoute>
-              </AuthProvider>
-            }
-          />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
