@@ -36,7 +36,14 @@ export default function AuthPage() {
 
   useEffect(() => {
     document.title = "Sign in | TeamTasks";
-  }, []);
+    
+    // Check if user is already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate("/", { replace: true });
+      }
+    });
+  }, [navigate]);
 
   const handleSignup = async (values: z.infer<typeof signupSchema>) => {
     const redirectUrl = `${window.location.origin}/`;
